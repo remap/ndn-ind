@@ -94,6 +94,11 @@ ndn_Error ndn_SocketTransport_connect
   (struct ndn_SocketTransport *self, ndn_SocketType socketType, const char *host,
    unsigned short port, struct ndn_ElementListener *elementListener);
 
+// TODO: write routine documentation
+ndn_Error ndn_SocketTransport_bind
+(struct ndn_SocketTransport* self, ndn_SocketType socketType, const char* host,
+	unsigned short* port, struct ndn_ElementListener* elementListener);
+
 /**
  * Send data to the socket.
  * @param self A pointer to the ndn_SocketTransport struct.

@@ -176,6 +176,108 @@ ndn_Error ndn_SocketTransport_connect
   return NDN_ERROR_success;
 }
 
+ndn_Error ndn_SocketTransport_bind
+(struct ndn_SocketTransport* self, ndn_SocketType socketType, const char* host,
+    unsigned short* port, struct ndn_ElementListener* elementListener)
+{
+#if defined(_WIN32)
+    // See: https://docs.microsoft.com/en-us/windows/win32/winsock/complete-client-code
+    SOCKET socketDescriptor = INVALID_SOCKET;
+#else
+    int socketDescriptor;
+#endif
+
+    ndn_ElementReader_reset(&self->elementReader, elementListener);
+
+    if (socketType == SOCKET_UNIX) {
+        return NDN_ERROR_unrecognized_ndn_SocketTransport;
+    }
+    else {
+        struct addrinfo hints;
+        char portString[10];
+        struct addrinfo* serverInfo;
+        struct sockaddr_in si;
+        memset((uint8_t*)&si, 0, sizeof(si));
+
+        if (isValidSocket(self->socketDescriptor)) {
+#if defined(_WIN32)
+            closesocket(self->socketDescriptor);
+            self->socketDescriptor = INVALID_SOCKET;
+#else
+            close(self->socketDescriptor);
+            self->socketDescriptor = -1;
+#endif
+        }
+
+#if defined(_WIN32)
+        if (!DidWSAStartup) {
+            WSADATA wsaData;
+            DidWSAStartup = 1;
+            if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0)
+                return NDN_ERROR_SocketTransport_cannot_connect_to_socket;
+        }
+#endif
+        if (strlen(host))
+        {
+            ndn_memset((uint8_t*)&hints, 0, sizeof(hints));
+            hints.ai_family = AF_UNSPEC;
+            if (socketType == SOCKET_TCP)
+                hints.ai_socktype = SOCK_STREAM;
+            else if (socketType == SOCKET_UDP)
+                hints.ai_socktype = SOCK_DGRAM;
+            else
+                return NDN_ERROR_unrecognized_ndn_SocketTransport;
+
+            sprintf(portString, "%d", *port);
+
+            if (getaddrinfo(host, portString, &hints, &serverInfo) != 0)
+                return NDN_ERROR_SocketTransport_error_in_getaddrinfo;
+
+            si = *((struct sockaddr_in*)serverInfo->ai_addr);
+            freeaddrinfo(serverInfo);
+        }
+        else
+        {
+            memset((uint8_t*)&si, 0, sizeof(si));
+            si.sin_family = AF_INET;
+            si.sin_port = htons(*port);
+            si.sin_addr.s_addr = htonl(INADDR_ANY);
+        }
+
+        socketDescriptor = socket(AF_INET,
+            (socketType == SOCKET_TCP ? SOCK_STREAM : SOCK_DGRAM),
+            (socketType == SOCKET_TCP ? IPPROTO_TCP : IPPROTO_UDP));
+
+        if (!isValidSocket(socketDescriptor))
+            return NDN_ERROR_SocketTransport_socket_is_not_open;
+
+        if (bind(socketDescriptor, (struct sockaddr*)&si, sizeof(si)) != 0) {
+#if defined(_WIN32)
+            closesocket(socketDescriptor);
+#else
+            close(socketDescriptor);
+#endif
+            return NDN_ERROR_SocketTransport_socket_is_not_open;
+        }
+
+        // if port was not specified -- get assigned port
+        if (!*port)
+        {
+            struct sockaddr_in sin;
+            socklen_t len = sizeof(sin);
+            if (getsockname(socketDescriptor, (struct sockaddr*)&sin, &len) != -1)
+                *port = ntohs(sin.sin_port);
+        }
+
+        if (!isValidSocket(socketDescriptor))
+            return NDN_ERROR_SocketTransport_socket_is_not_open;
+
+    }
+
+    self->socketDescriptor = socketDescriptor;
+    return NDN_ERROR_success;
+}
+
 ndn_Error ndn_SocketTransport_send(struct ndn_SocketTransport *self, const uint8_t *data, size_t dataLength)
 {
   if (!isValidSocket(self->socketDescriptor))

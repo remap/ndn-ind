@@ -88,6 +88,14 @@ static __inline ndn_Error ndn_UdpTransport_connect
     (&self->base, SOCKET_UDP, host, port, elementListener);
 }
 
+static __inline ndn_Error ndn_UdpTransport_bind
+(struct ndn_UdpTransport* self, const char* host, unsigned short* port,
+    struct ndn_ElementListener* elementListener)
+{
+    return ndn_SocketTransport_bind
+    (&self->base, SOCKET_UDP, host, port, elementListener);
+}
+
 /**
  * Send data to the socket.
  * @param self A pointer to the ndn_UdpTransport struct.
