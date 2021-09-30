@@ -52,6 +52,7 @@ UdpTransport::ConnectionInfo::~ConnectionInfo()
 
 UdpTransport::UdpTransport(bool readRawPackets)
   : isConnected_(false), transport_(new struct ndn_UdpTransport),
+    isBound_(false), boundPort_(0),
     elementBuffer_(new DynamicUInt8Vector(1000))
 {
   ndn_UdpTransport_initialize
@@ -87,6 +88,23 @@ UdpTransport::connect
 }
 
 void
+UdpTransport::bind(const Transport::ConnectionInfo& connectionInfo,
+    ElementListener& elementListener)
+{
+    const UdpTransport::ConnectionInfo& udpConnectionInfo =
+        dynamic_cast<const UdpTransport::ConnectionInfo&>(connectionInfo);
+
+    boundPort_ = udpConnectionInfo.getPort();
+    ndn_Error error;
+    if ((error = ndn_UdpTransport_bind
+    (transport_.get(), (char*)udpConnectionInfo.getHost().c_str(),
+        &boundPort_, &elementListener)))
+        throw runtime_error(ndn_getErrorString(error));
+
+    isBound_ = true;
+}
+
+void
 UdpTransport::send(const uint8_t *data, size_t dataLength)
 {
   ndn_Error error;
@@ -108,6 +126,18 @@ bool
 UdpTransport::getIsConnected()
 {
   return isConnected_;
+}
+
+bool
+UdpTransport::getIsBound() const
+{
+    return isBound_;
+}
+
+unsigned short
+UdpTransport::getBoundPort() const
+{ 
+    return boundPort_; 
 }
 
 void

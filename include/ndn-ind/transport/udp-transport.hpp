@@ -127,6 +127,14 @@ public:
   connect(const Transport::ConnectionInfo& connectionInfo,
           ElementListener& elementListener, const OnConnected& onConnected);
 
+  // TODO: move to transport.hpp
+  typedef func_lib::function<void(const ptr_lib::shared_ptr<Transport>&, 
+          const ptr_lib::shared_ptr<Transport::ConnectionInfo>&)> onIncomingConnection;
+
+  virtual void
+  bind(const Transport::ConnectionInfo& connectionInfo,
+       ElementListener& elementListener);//, const OnIncomingConnection& onIncomingConnection);
+
   /**
    * Send data to the host
    * @param data A pointer to the buffer of data to send.
@@ -150,6 +158,12 @@ public:
   virtual bool
   getIsConnected();
 
+  virtual bool
+  getIsBound() const;
+
+  unsigned short
+  getBoundPort() const;
+
   /**
    * Close the connection to the host.
    */
@@ -160,6 +174,8 @@ private:
   ptr_lib::shared_ptr<struct ndn_UdpTransport> transport_;
   ptr_lib::shared_ptr<DynamicUInt8Vector> elementBuffer_;
   bool isConnected_;
+  bool isBound_;
+  unsigned short boundPort_;
 };
 
 }
