@@ -64,6 +64,10 @@ public:
      const ndn::ptr_lib::shared_ptr<ndn::Transport>& transport,
      const ndn::ptr_lib::shared_ptr<const ndn::Transport::ConnectionInfo>& connectionInfo);
 
+  bool
+  addChannel(const ndn::ptr_lib::shared_ptr<ndn::Transport>& transport,
+      const ndn::ptr_lib::shared_ptr<const ndn::Transport::ConnectionInfo>& connectionInfo);
+
   /**
    * Add a new face to communicate with TCP to host:port. This immediately
    * connects. The URI to use in the faces/query and faces/list commands will be

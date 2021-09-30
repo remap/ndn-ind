@@ -66,6 +66,20 @@ MicroForwarder::addFace(const char *host, unsigned short port)
 }
 
 bool
+MicroForwarder::addChannel(const ptr_lib::shared_ptr<Transport>& transport,
+    const ptr_lib::shared_ptr<const Transport::ConnectionInfo>& connectionInfo)
+{
+    auto face = ptr_lib::make_shared<ForwarderFace>(this, "udp-bind", transport);
+    
+    ((ndn::UdpTransport*)transport.get())->bind(*connectionInfo, *face);
+    faces_.push_back(face);
+
+    int faceId = face->getFaceId();
+    _LOG_INFO("Created face " << faceId << ": " << face->getUri());
+    return true;
+}
+
+bool
 MicroForwarder::addRoute(const Name& name, int faceId, int cost)
 {
   ForwarderFace* nextHopFace = findFace(faceId);
