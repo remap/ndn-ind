@@ -32,7 +32,7 @@ DynamicUInt8Vector::DynamicUInt8Vector(size_t initialLength)
   // resize() than in the constructor.
   vector_->resize(initialLength);
 
-  ndn_DynamicUInt8Array_initialize(this, &vector_->front(), initialLength, DynamicUInt8Vector::realloc);
+  ndn_DynamicUInt8Array_initialize(this, (vector_->empty() ? 0 : &vector_->front()), initialLength, DynamicUInt8Vector::realloc);
 }
 
 uint8_t*
@@ -41,9 +41,10 @@ DynamicUInt8Vector::realloc(struct ndn_DynamicUInt8Array *self, uint8_t *array, 
   // Because this method is private, assume there is not a problem with downcasting.
   DynamicUInt8Vector *thisObject = (DynamicUInt8Vector *)self;
 
-  if (array != &thisObject->vector_->front())
-    // We don't expect this to ever happen. The caller didn't pass the array from this object.
-    return 0;
+  if (!thisObject->vector_->empty())
+     if (array != &thisObject->vector_->front())
+        // We don't expect this to ever happen. The caller didn't pass the array from this object.
+        return 0;
 
   thisObject->vector_->resize(length);
   return &thisObject->vector_->front();
