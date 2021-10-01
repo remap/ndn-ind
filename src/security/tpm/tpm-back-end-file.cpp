@@ -42,6 +42,10 @@
 #include <ndn-ind/security/tpm/tpm-key-handle-memory.hpp>
 #ifdef NDN_IND_HAVE_BOOST_FILESYSTEM
 #include <boost/filesystem.hpp>
+#else 
+#ifdef NDN_IND_HAVE_CXX17
+#include <filesystem>
+#endif
 #endif
 #if defined(_WIN32)
 #include <direct.h>
@@ -90,10 +94,15 @@ TpmBackEndFile::TpmBackEndFile(const string& locationPath)
     // Try with create_directories.
     boost::filesystem::create_directories(keyStorePath_);
 #else
+#ifdef NDN_IND_HAVE_CXX17
+      filesystem::create_directories(keyStorePath_);
+#else
     throw TpmBackEnd::Error
       (string("TpmBackEndFile: Error '") + strerror(errno) + "' in 'mkdir " + keyStorePath_ +
        "' . Create the parent directory and try again.");
 #endif
+#endif
+
   }
 }
 
