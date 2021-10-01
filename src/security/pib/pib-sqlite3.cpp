@@ -43,6 +43,10 @@
 #include "../../util/sqlite3-statement.hpp"
 #ifdef NDN_IND_HAVE_BOOST_FILESYSTEM
 #include <boost/filesystem.hpp>
+#else
+#ifdef NDN_IND_HAVE_CXX17
+#include <filesystem>
+#endif
 #endif
 #include <ndn-ind/security/pib/pib-sqlite3.hpp>
 
@@ -219,13 +223,21 @@ PibSqlite3::PibSqlite3
   else
     databaseDirectoryPath = getDefaultDatabaseDirectoryPath();
 
+#if defined(_WIN32)
+  int status = 0;
+#else
   // ::mkdir will work if the parent directory already exists, which is most cases.
   int status = ::mkdir(databaseDirectoryPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+#endif
   if (status != 0 && status != EEXIST) {
     // Can't create the directory with ::mkdir.
 #ifdef NDN_IND_HAVE_CXX17
     // Try with create_directories.
+#if NDN_IND_HAVE_BOOST_FILESYSTEM
     boost::filesystem::create_directories(databaseDirectoryPath);
+#else
+      filesystem::create_directories(databaseDirectoryPath);
+#endif
 #else
     throw PibImpl::Error
       (string("PibSqlite3: Error '") + strerror(errno) + "' in 'mkdir " + databaseDirectoryPath +
@@ -608,6 +620,20 @@ WHERE certificates.is_default=1 AND keys.key_name=?");
 string
 PibSqlite3::getDefaultDatabaseDirectoryPath()
 {
+#if defined(_WIN32)
+#ifdef NDN_IND_HAVE_CXX17
+    // Try with create_directories.
+#if NDN_IND_HAVE_BOOST_FILESYSTEM
+    boost::filesystem::create_directories(databaseDirectoryPath);
+#else
+    return filesystem::current_path().string();
+#endif
+#else
+    const char* homeDrive = getenv("HOMEDRIVE");
+    const char* homePath = getenv("HOMEPATH");
+    return  string(homeDrive) + string(homePath);
+#endif
+#else
   // Note: We don't use <filesystem> support because it is not "header-only"
   // and requires linking to libraries.
   const char* home = getenv("HOME");
@@ -621,6 +647,7 @@ PibSqlite3::getDefaultDatabaseDirectoryPath()
 
   // TODO: Handle non-unix file systems which don't use "/".
   return homeDir + '/' + ".ndn";
+#endif
 }
 
 bool
