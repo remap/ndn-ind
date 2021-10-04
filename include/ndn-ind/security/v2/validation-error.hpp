@@ -45,7 +45,7 @@ namespace ndn {
  */
 class ndn_ind_dll ValidationError {
 public:
-  static const int NO_ERROR =                    0;
+  static const int NO_VALIDATION_ERROR =                    0;
   static const int INVALID_SIGNATURE =           1;
   static const int NO_SIGNATURE =                2;
   static const int CANNOT_RETRIEVE_CERTIFICATE = 3;
@@ -55,6 +55,7 @@ public:
   static const int EXCEEDED_DEPTH_LIMIT =        7;
   static const int INVALID_KEY_LOCATOR =         8;
   static const int POLICY_ERROR =                9;
+  static const int REVOKED =                     10;
   static const int IMPLEMENTATION_ERROR =        255;
   // Custom error codes should use >= USER_MIN.
   static const int USER_MIN =                    256;

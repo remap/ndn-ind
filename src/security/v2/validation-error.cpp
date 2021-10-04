@@ -44,7 +44,7 @@ operator<<(ostream& os, const ValidationError& error)
 {
   int code = error.getCode();
 
-  if (code == ValidationError::NO_ERROR)
+  if (code == ValidationError::NO_VALIDATION_ERROR)
     os << "No error";
   else if (code == ValidationError::INVALID_SIGNATURE)
     os << "Invalid signature";
@@ -64,6 +64,8 @@ operator<<(ostream& os, const ValidationError& error)
     os << "Key locator violates validation policy";
   else if (code == ValidationError::POLICY_ERROR)
     os << "Validation policy error";
+  else if (code == ValidationError::REVOKED)
+    os << "Certificate is revoked";
   else if (code == ValidationError::IMPLEMENTATION_ERROR)
     os << "Internal implementation error";
   else if (code >= ValidationError::USER_MIN)
