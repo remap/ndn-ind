@@ -25,6 +25,7 @@
 #include <ndn-ind/lite/encoding/tlv-0_3-wire-format-lite.hpp>
 #include <ndn-ind/lite/lp/lp-packet-lite.hpp>
 #include <ndn-ind/transport/tcp-transport.hpp>
+#include <ndn-ind/transport/udp-transport.hpp>
 #include <ndn-ind/network-nack.hpp>
 #include <ndn-ind/control-parameters.hpp>
 #include <ndn-ind/control-response.hpp>
