@@ -233,7 +233,7 @@ PibSqlite3::PibSqlite3
     // Can't create the directory with ::mkdir.
 #ifdef NDN_IND_HAVE_CXX17
     // Try with create_directories.
-#if NDN_IND_HAVE_BOOST_FILESYSTEM
+#ifdef NDN_IND_HAVE_BOOST_FILESYSTEM
     boost::filesystem::create_directories(databaseDirectoryPath);
 #else
       filesystem::create_directories(databaseDirectoryPath);
