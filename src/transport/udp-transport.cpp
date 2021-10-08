@@ -157,6 +157,11 @@ UdpTransport::close()
     throw runtime_error(ndn_getErrorString(error));
 }
 
+int 
+UdpTransport::getSocketFd() const
+{
+    return transport_->base.socketDescriptor;
+}
 }
 
 #endif // NDN_IND_HAVE_UNISTD_H

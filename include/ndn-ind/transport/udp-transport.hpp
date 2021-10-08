@@ -174,6 +174,9 @@ public:
   virtual void
   close();
 
+protected:
+  int getSocketFd() const;
+
 private:
   ptr_lib::shared_ptr<struct ndn_UdpTransport> transport_;
   ptr_lib::shared_ptr<DynamicUInt8Vector> elementBuffer_;
