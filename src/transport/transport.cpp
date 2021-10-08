@@ -74,6 +74,12 @@ Transport::processEvents()
   throw logic_error("unimplemented");
 }
 
+void
+Transport::onReceiveData(const uint8_t* data, size_t dataLength)
+{
+	throw logic_error("unimplemented");
+}
+
 bool
 Transport::getIsConnected()
 {

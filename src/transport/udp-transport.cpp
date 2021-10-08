@@ -122,6 +122,15 @@ UdpTransport::processEvents()
     throw runtime_error(ndn_getErrorString(error));
 }
 
+void
+UdpTransport::onReceiveData(const uint8_t* data, size_t dataLength)
+{
+    ndn_Error error;
+    if ((error = ndn_UdpTransport_onReceiveData
+        (transport_.get(), (uint8_t*)data, dataLength)))
+        throw runtime_error(ndn_getErrorString(error));
+}
+
 bool
 UdpTransport::getIsConnected()
 {

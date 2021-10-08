@@ -131,6 +131,14 @@ ndn_UdpTransport_processEvents
   return ndn_SocketTransport_processEvents(&self->base, buffer, bufferLength);
 }
 
+// TODO: add documentation
+static __inline ndn_Error
+ndn_UdpTransport_onReceiveData
+(struct ndn_UdpTransport* self, uint8_t* buffer, size_t bufferLength)
+{
+    return ndn_SocketTransport_onReceiveData(&self->base, buffer, bufferLength);
+}
+
 /**
  * Close the socket.
  * @param self A pointer to the ndn_UdpTransport struct.

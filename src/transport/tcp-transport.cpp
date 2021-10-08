@@ -120,6 +120,15 @@ TcpTransport::processEvents()
     throw runtime_error(ndn_getErrorString(error));
 }
 
+void
+TcpTransport::onReceiveData(const uint8_t* data, size_t dataLength)
+{
+    ndn_Error error;
+    if ((error = ndn_TcpTransport_onReceiveData
+    (transport_.get(), (uint8_t*)data, dataLength)))
+        throw runtime_error(ndn_getErrorString(error));
+}
+
 bool
 TcpTransport::getIsConnected()
 {

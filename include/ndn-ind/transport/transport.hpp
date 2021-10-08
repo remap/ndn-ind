@@ -117,6 +117,10 @@ public:
   virtual void
   processEvents() = 0;
 
+  // TODO: add documentation
+  virtual void
+  onReceiveData(const uint8_t* data, size_t dataLength);
+
   virtual bool
   getIsConnected();
 
