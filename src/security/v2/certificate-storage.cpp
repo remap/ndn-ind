@@ -32,9 +32,12 @@
  * A copy of the GNU Lesser General Public License is in the file COPYING.
  */
 
+#include <ndn-ind/util/logging.hpp>
 #include <ndn-ind/security/v2/certificate-storage.hpp>
 
 using namespace std;
+
+INIT_LOGGER("ndn.CertificateStorage");
 
 namespace ndn {
 
@@ -57,6 +60,81 @@ CertificateStorage::isCertificateKnown(const Name& certificatePrefix)
   return !!trustAnchors_.find(certificatePrefix) ||
          !!verifiedCertificateCache_.find(certificatePrefix) ||
          !!unverifiedCertificateCache_.find(certificatePrefix);
+}
+
+bool
+CertificateStorage::cacheVerifiedCertificate(const CertificateV2& certificate)
+{
+  const X509CrlInfo::RevokedCertificate* revoked = findRevokedCertificate
+    (certificate.getIssuerName(), certificate.getX509SerialNumber());
+  if (revoked) {
+    _LOG_ERROR("REVOKED: The CRL from issuer " <<
+      certificate.getIssuerName().toUri() << " has revoked serial number " <<
+      revoked->getSerialNumber().toHex() << " at time " <<
+      toIsoString(revoked->getRevocationDate()) << ". Rejecting fetched certificate " <<
+      certificate.getName().toUri());
+    return false;
+  }
+
+  verifiedCertificateCache_.insert(certificate);
+  return true;
+}
+
+void
+CertificateStorage::cacheVerifiedCrl(const X509CrlInfo& crlInfo)
+{
+  if (!verifiedCrlCache_.insert(crlInfo))
+    // The error has been logged, such as expired CRL.
+    return;
+
+  // Remove revoked certificates from verifiedCertificateCache_ .
+  const std::map<Name, CertificateCacheV2::Entry>& certificates =
+    verifiedCertificateCache_.getCertificatesByName();
+  vector<Name> certificatesToRemove;
+  for (auto certEntry = certificates.begin(); certEntry != certificates.end(); ++certEntry) {
+    if (!certEntry->second.certificate_->getIssuerName().equals(crlInfo.getIssuerName()))
+      // The certificate is not from the same issuer as the CRL.
+      continue;
+
+    const X509CrlInfo::RevokedCertificate* revoked = findRevokedCertificate
+      (certEntry->second.certificate_->getIssuerName(),
+       certEntry->second.certificate_->getX509SerialNumber());
+    if (revoked) {
+      _LOG_ERROR("REVOKED: The newly-fetched CRL with thisUpdate time " <<
+        toIsoString(crlInfo.getThisUpdate()) << " has revoked serial number " <<
+        revoked->getSerialNumber().toHex() << " at time " <<
+        toIsoString(revoked->getRevocationDate()) << ". Removing certificate " <<
+        certEntry->second.certificate_->getName().toUri());
+      // Remove below after we finish reading the list.
+      certificatesToRemove.push_back(certEntry->second.certificate_->getName());
+    }
+  }
+
+  // Now remove the revoked certificates.
+  for (size_t i = 0; i < certificatesToRemove.size(); ++i)
+    verifiedCertificateCache_.deleteCertificate(certificatesToRemove[i]);
+}
+
+const X509CrlInfo::RevokedCertificate*
+CertificateStorage::findRevokedCertificate
+  (const Name& issuerName, const Blob& serialNumber) const
+{
+  if (serialNumber.size() == 0)
+    // This can happen by calling getX509SerialNumber() on a non-X.509 certificate.
+    return 0;
+
+  ptr_lib::shared_ptr<X509CrlInfo> crlInfo = verifiedCrlCache_.find(issuerName);
+  if (!crlInfo)
+    return 0;
+
+  for (size_t i = 0; i < crlInfo->getRevokedCertificateCount(); ++i) {
+    const X509CrlInfo::RevokedCertificate& entry =
+      crlInfo->getRevokedCertificate(i);
+    if (entry.getSerialNumber().equals(serialNumber))
+      return &entry;
+  }
+
+  return 0;
 }
 
 }
