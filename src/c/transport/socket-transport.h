@@ -129,6 +129,10 @@ ndn_Error ndn_SocketTransport_receiveIsReady(struct ndn_SocketTransport *self, i
 ndn_Error ndn_SocketTransport_receive
   (struct ndn_SocketTransport *self, uint8_t *buffer, size_t bufferLength, size_t *nBytes);
 
+// TODO: add documentation
+ndn_Error ndn_SocketTransport_onReceiveData
+  (struct ndn_SocketTransport* self, uint8_t* buffer, size_t bufferLength);
+
 /**
  * Process any data to receive.  For each element received, call
  * (*elementListener->onReceivedElement)(element, elementLength) for the

@@ -383,6 +383,13 @@ ndn_SocketTransport_processEvents
   }
 }
 
+ndn_Error
+ndn_SocketTransport_onReceiveData
+  (struct ndn_SocketTransport* self, uint8_t* buffer, size_t bufferLength)
+{
+    return ndn_ElementReader_onReceivedData(&self->elementReader, buffer, bufferLength);
+}
+
 ndn_Error ndn_SocketTransport_close(struct ndn_SocketTransport *self)
 {
   if (!isValidSocket(self->socketDescriptor))
