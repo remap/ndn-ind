@@ -112,15 +112,17 @@ ndn_Error ndn_SocketTransport_connect
     char portString[10];
     struct addrinfo *serverInfo;
     struct addrinfo *p;
+    int hasValidSocket = 0;
 
     if (isValidSocket(self->socketDescriptor)) {
 #if defined(_WIN32)
-      closesocket(self->socketDescriptor);
-      self->socketDescriptor = INVALID_SOCKET;
+//      closesocket(self->socketDescriptor);
+//      self->socketDescriptor = INVALID_SOCKET;
 #else
-      close(self->socketDescriptor);
-      self->socketDescriptor = -1;
+//      close(self->socketDescriptor);
+//      self->socketDescriptor = -1;
 #endif
+        hasValidSocket = 1;
     }
 
 #if defined(_WIN32)
@@ -148,7 +150,8 @@ ndn_Error ndn_SocketTransport_connect
 
     // loop through all the results and connect to the first we can
     for(p = serverInfo; p != NULL; p = p->ai_next) {
-      socketDescriptor = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+      socketDescriptor = (hasValidSocket ? self->socketDescriptor :
+          socket(p->ai_family, p->ai_socktype, p->ai_protocol));
       if (!isValidSocket(socketDescriptor))
         continue;
 
