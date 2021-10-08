@@ -22,10 +22,13 @@
 #ifndef NDN_MICRO_FORWARDER_HPP
 #define NDN_MICRO_FORWARDER_HPP
 
+#include <map>
+
 #include <ndn-ind/interest.hpp>
 #include <ndn-ind/data.hpp>
 #include <ndn-ind/face.hpp>
-#include <ndn-ind/transport/transport.hpp>
+#include <ndn-ind/transport/tcp-transport.hpp>
+#include <ndn-ind/transport/udp-transport.hpp>
 
 namespace ndntools {
 
@@ -64,10 +67,6 @@ public:
      const ndn::ptr_lib::shared_ptr<ndn::Transport>& transport,
      const ndn::ptr_lib::shared_ptr<const ndn::Transport::ConnectionInfo>& connectionInfo);
 
-  bool
-  addChannel(const ndn::ptr_lib::shared_ptr<ndn::Transport>& transport,
-      const ndn::ptr_lib::shared_ptr<const ndn::Transport::ConnectionInfo>& connectionInfo);
-
   /**
    * Add a new face to communicate with TCP to host:port. This immediately
    * connects. The URI to use in the faces/query and faces/list commands will be
@@ -78,6 +77,10 @@ public:
    */
   int
   addFace(const char *host, unsigned short port = 6363);
+
+  // TODO: add documentation
+  ndn::ptr_lib::shared_ptr<const ndn::UdpTransport>
+      addChannel(const ndn::ptr_lib::shared_ptr<const ndn::UdpTransport::ConnectionInfo>& connectionInfo);
 
   /**
    * Find or create the FIB entry with the given name and add the ForwarderFace
@@ -164,7 +167,12 @@ public:
     return instance_;
   }
 
+  std::map<int, std::string> getFaces() const;
+  std::map<std::string, std::vector<int> > getRoutes() const;
+
 private:
+    class UdpChannel;
+
   /**
    * A ForwarderFace is used by the faces list to represent a connection using
    * the* given Transport. (This is not to be confused with the application Face.)
@@ -420,6 +428,9 @@ private:
   ForwarderFace*
   findFace(int faceId);
 
+  ForwarderFace*
+  findFaceByUri(std::string uri);
+
   /**
    * Mark the PitEntry at PIT_[i] as removed (in case something references it)
    * and remove it.
@@ -434,6 +445,7 @@ private:
   std::vector<ndn::ptr_lib::shared_ptr<PitEntry> > PIT_;
   std::vector<ndn::ptr_lib::shared_ptr<FibEntry> > FIB_;
   std::vector<ndn::ptr_lib::shared_ptr<ForwarderFace> > faces_;
+  std::vector<ndn::ptr_lib::shared_ptr<UdpChannel> > channels_;
   std::chrono::nanoseconds minPitEntryLifetime_;
 
   ndn::Name localhostNamePrefix;

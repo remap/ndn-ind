@@ -42,6 +42,141 @@ INIT_LOGGER("ndntools.MicroForwarder");
 
 namespace ndntools {
 
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#if NDN_IND_HAVE_UNISTD_H
+#include <unistd.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <arpa/inet.h>
+#include <poll.h>
+#endif
+#if defined(_WIN32)
+#include <ws2tcpip.h>
+#endif
+
+    class MicroForwarder::UdpChannel : public ndn::ElementListener, public ndn::UdpTransport {
+    public:
+
+        UdpChannel(MicroForwarder *parent, int port = 0, std::string host = "")
+            : connInfo_(ptr_lib::make_shared<ndn::UdpTransport::ConnectionInfo>(host.c_str(), port))
+            , parent_(parent)
+        {
+            bind(*connInfo_, *this);
+        }
+        UdpChannel(MicroForwarder* parent, ndn::ptr_lib::shared_ptr<const UdpTransport::ConnectionInfo> connInfo)
+            : connInfo_(connInfo)
+            , parent_(parent)
+        {
+            bind(*connInfo_, *this);
+        }
+
+        void processEvents()
+        {
+            // Loop until there is no more data in the receive buffer.
+            while (1)
+            {
+                ndn_Error error;
+                size_t nBytes;
+
+                int socket = getSocketFd();
+
+                if (!pollSocket(socket))
+                    return;
+
+                { // receive
+                    struct sockaddr_in from;
+                    int slen = sizeof(from);
+                    int nBytes;
+                    uint8_t buffer[MAX_NDN_PACKET_SIZE];
+                    size_t bufferLength;
+
+                    if ((nBytes = recvfrom(socket, (char*)buffer, MAX_NDN_PACKET_SIZE, 
+                        0, (struct sockaddr*)&from, &slen)) == -1)
+#if defined(_WIN32)
+                        throw runtime_error("error in recvfrom: " + to_string(WSAGetLastError()));
+#else
+                        throw runtime_error("error in recvfrom: "+string(strerror(errno)));
+#endif
+
+                    UdpTransport* udpTransport;
+                    string remoteHost(inet_ntoa(from.sin_addr));
+                    int remotePort = ntohs(from.sin_port);
+                    string faceUri = "udp://" + remoteHost + ":" + to_string(remotePort);
+                    ForwarderFace* face = parent_->findFaceByUri(faceUri);
+
+                    if (!face)
+                    {
+                        auto faceTransport = make_shared<UdpTransport>();
+                        UdpTransport::ConnectionInfo connInfo(connInfo_->getHost().c_str(), getBoundPort());
+                        faceTransport->bind(connInfo, *this);
+
+                        int faceId = parent_->addFace(faceUri, faceTransport,
+                            make_shared<ndn::UdpTransport::ConnectionInfo>(remoteHost.c_str(), remotePort));
+
+                        udpTransport = faceTransport.get();
+
+                        _LOG_DEBUG("Created on-demand Face " << faceUri);
+                    }
+                    else
+                        udpTransport = dynamic_cast<UdpTransport*>(face->getTransport());
+
+                    udpTransport->onReceiveData(buffer, nBytes);
+                }
+            }
+        }
+
+    private:
+        ptr_lib::shared_ptr<const UdpTransport::ConnectionInfo> connInfo_;
+        MicroForwarder* parent_;
+
+        bool pollSocket(int s)
+        {
+            int pollResult;
+#if defined(_WIN32)
+            // See: https://github.com/microsoft/Windows-classic-samples/blob/master/Samples/Win7Samples/netds/winsock/wsapoll/poll.cpp
+            WSAPOLLFD pollInfo = { 0 };
+#else
+            struct pollfd pollInfo[1];
+#endif
+#if defined(_WIN32)
+            pollInfo.fd = s;
+            pollInfo.events = POLLRDNORM;
+            pollResult = WSAPoll(&pollInfo, 1, 0);
+#else
+            pollInfo[0].fd = self->socketDescriptor;
+            pollInfo[0].events = POLLIN;
+            pollResult = poll(pollInfo, 1, 0);
+#endif
+
+#if defined(_WIN32)
+            if (pollResult == SOCKET_ERROR)
+#else
+            if (pollResult < 0)
+#endif
+                throw runtime_error("poll error: " + string(strerror(errno)));
+            else if (pollResult == 0)
+                // Timeout, so no data ready.
+                return false;
+            else {
+#if defined(_WIN32)
+                if (pollInfo.revents & POLLRDNORM)
+#else
+                if (pollInfo[0].revents & POLLIN)
+#endif
+                    return true;
+            }
+
+            return false;
+        }
+
+        void onReceivedElement(const uint8_t* element, size_t elementLength) override
+        { /* phony call - do nothing */ }
+    };
+
+
 int
 MicroForwarder::addFace
   (const string& uri, const ptr_lib::shared_ptr<Transport>& transport,
@@ -66,18 +201,15 @@ MicroForwarder::addFace(const char *host, unsigned short port)
      ptr_lib::make_shared<TcpTransport::ConnectionInfo>(host, port));
 }
 
-bool
-MicroForwarder::addChannel(const ptr_lib::shared_ptr<Transport>& transport,
-    const ptr_lib::shared_ptr<const Transport::ConnectionInfo>& connectionInfo)
+ndn::ptr_lib::shared_ptr<const ndn::UdpTransport>
+MicroForwarder::addChannel(const ptr_lib::shared_ptr<const UdpTransport::ConnectionInfo>& connectionInfo)
 {
-    auto face = ptr_lib::make_shared<ForwarderFace>(this, "udp-bind", transport);
-    
-    ((ndn::UdpTransport*)transport.get())->bind(*connectionInfo, *face);
-    faces_.push_back(face);
+    auto channel = ptr_lib::make_shared<UdpChannel>(this, connectionInfo);
 
-    int faceId = face->getFaceId();
-    _LOG_INFO("Created face " << faceId << ": " << face->getUri());
-    return true;
+    channels_.push_back(channel);
+
+    _LOG_INFO("Created UDP listen channel on port " << channel->getBoundPort());
+    return channel;
 }
 
 bool
@@ -157,6 +289,9 @@ MicroForwarder::processEvents()
 {
   for (int i = 0; i < faces_.size(); ++i) {
     faces_[i]->processEvents();
+  }
+  for (auto ch : channels_) {
+      ch->processEvents();
   }
 }
 
@@ -439,6 +574,34 @@ MicroForwarder::onReceivedLocalhostInterest
   }
 }
 
+std::map<int, std::string> 
+MicroForwarder::getFaces() const
+{
+    map<int, string> faces;
+
+    for (auto f : faces_)
+        faces[f->getFaceId()] = f->getUri();
+
+    return faces;
+}
+
+std::map<string, std::vector<int>> 
+MicroForwarder::getRoutes() const
+{
+    map<string, vector<int> > routes;
+
+    for (auto fib : FIB_)
+    {
+        for (int i = 0; i < fib->getNextHopCount(); ++i)
+        {
+            auto nextHop = fib->getNextHop(i);
+            routes[fib->getName().toUri()].push_back(nextHop.getFace()->getFaceId());
+        }
+    }
+
+    return routes;
+}
+
 MicroForwarder::ForwarderFace*
 MicroForwarder::findFace(int faceId)
 {
@@ -448,6 +611,17 @@ MicroForwarder::findFace(int faceId)
   }
 
   return 0;
+}
+
+MicroForwarder::ForwarderFace*
+MicroForwarder::findFaceByUri(std::string uri)
+{
+    for (int i = 0; i < faces_.size(); ++i) {
+        if (faces_[i]->getUri() == uri)
+            return faces_[i].get();
+    }
+
+    return 0;
 }
 
 int MicroForwarder::ForwarderFace::lastFaceId_ = 0;
