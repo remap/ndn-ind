@@ -167,7 +167,7 @@ private:
      * elementListener provided by the MicroForwarder (when
      * MicroForwarderTransport::connect called its addFace).
      */
-    void
+    virtual void
     onReceivedData(const uint8_t *data, size_t dataLength)
     {
       elementReader_.onReceivedData(data, dataLength);
