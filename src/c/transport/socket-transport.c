@@ -251,6 +251,12 @@ ndn_Error ndn_SocketTransport_bind
         if (!isValidSocket(socketDescriptor))
             return NDN_ERROR_SocketTransport_socket_is_not_open;
 
+        int reuse = 1;
+        if (setsockopt(socketDescriptor, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0)
+        {
+            return NDN_ERROR_SocketTransport_socket_is_not_open;
+        }
+
         if (bind(socketDescriptor, (struct sockaddr*)&si, sizeof(si)) != 0) {
 #if defined(_WIN32)
             closesocket(socketDescriptor);
