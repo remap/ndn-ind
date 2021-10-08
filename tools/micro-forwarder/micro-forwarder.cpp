@@ -88,7 +88,13 @@ namespace ndntools {
 
                 { // receive
                     struct sockaddr_in from;
-                    int slen = sizeof(from);
+#if defined(_WIN32)
+                    int
+#else
+                    unsigned int 
+#endif 
+                        slen = sizeof(from);
+
                     int nBytes;
                     uint8_t buffer[MAX_NDN_PACKET_SIZE];
                     size_t bufferLength;
@@ -146,7 +152,7 @@ namespace ndntools {
             pollInfo.events = POLLRDNORM;
             pollResult = WSAPoll(&pollInfo, 1, 0);
 #else
-            pollInfo[0].fd = self->socketDescriptor;
+            pollInfo[0].fd = s;
             pollInfo[0].events = POLLIN;
             pollResult = poll(pollInfo, 1, 0);
 #endif
