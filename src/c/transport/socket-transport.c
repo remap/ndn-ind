@@ -135,7 +135,7 @@ ndn_Error ndn_SocketTransport_connect
 #endif
 
     ndn_memset((uint8_t *)&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
+    hints.ai_family = AF_INET;
     if (socketType == SOCKET_TCP)
       hints.ai_socktype = SOCK_STREAM;
     else if (socketType == SOCKET_UDP)
