@@ -78,6 +78,12 @@ public:
   int
   addFace(const char *host, unsigned short port = 6363);
 
+  /**
+   * TODO
+   */
+  void
+  removeFace(int faceId);
+
   // TODO: add documentation
   ndn::ptr_lib::shared_ptr<const ndn::UdpTransport>
       addChannel(const ndn::ptr_lib::shared_ptr<const ndn::UdpTransport::ConnectionInfo>& connectionInfo);
@@ -389,6 +395,15 @@ private:
     addNextHop(const ndn::ptr_lib::shared_ptr<NextHopRecord>& nextHop)
     {
       nextHops_.push_back(nextHop);
+    }
+
+    void
+    removeNextHop(const NextHopRecord* nextHop)
+    {
+        auto it = std::remove_if(nextHops_.begin(), nextHops_.end(),
+            [nextHop](auto p) { return nextHop == p.get(); });
+        if (it != nextHops_.end())
+            nextHops_.erase(it);
     }
 
     /**

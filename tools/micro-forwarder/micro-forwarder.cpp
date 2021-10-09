@@ -207,6 +207,57 @@ MicroForwarder::addFace(const char *host, unsigned short port)
      ptr_lib::make_shared<TcpTransport::ConnectionInfo>(host, port));
 }
 
+void
+MicroForwarder::removeFace(int faceId)
+{
+    // remove FIB entries
+    for (auto it = FIB_.begin(); it != FIB_.end(); /*nothing*/)
+    {
+        auto fibEntry = *it;
+        bool removeEntry = false;
+
+        for (int i = 0; i < fibEntry->getNextHopCount(); ++i)
+        {
+            auto& nextHop = fibEntry->getNextHop(i);
+
+            if (nextHop.getFace()->getFaceId() == faceId)
+            {
+                fibEntry->removeNextHop(&nextHop);
+                removeEntry = (fibEntry->getNextHopCount() == 0);
+                break;
+            }
+        }
+
+        if (removeEntry)
+        {
+            it = FIB_.erase(it);
+            _LOG_INFO("Removed FIB entry " << fibEntry->getName().toUri());
+        }
+        else
+            ++it;
+    }
+
+    // clear PIT entries
+    for (int i = PIT_.size() - 1; i >= 0; --i) {
+        PitEntry& entry = *PIT_[i];
+
+        if (entry.getInFace() && 
+            entry.getInFace()->getFaceId() == faceId)
+            removePitEntry(i);
+    }
+
+    // remove face
+    auto it = remove_if(faces_.begin(), faces_.end(),
+                [faceId](auto f) { return faceId == f->getFaceId(); });
+    if (it != faces_.end())
+    {
+        faces_.erase(it);
+        _LOG_INFO("Removed face " << faceId);
+    }
+    else
+        _LOG_WARN("Face with face id " << faceId << " not found");
+}
+
 ndn::ptr_lib::shared_ptr<const ndn::UdpTransport>
 MicroForwarder::addChannel(const ptr_lib::shared_ptr<const UdpTransport::ConnectionInfo>& connectionInfo)
 {
