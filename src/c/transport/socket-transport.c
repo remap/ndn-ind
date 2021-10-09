@@ -200,6 +200,7 @@ ndn_Error ndn_SocketTransport_bind
         char portString[10];
         struct addrinfo* serverInfo;
         struct sockaddr_in si;
+        int reuseAddrOpt = 1;
         memset((uint8_t*)&si, 0, sizeof(si));
 
         if (isValidSocket(self->socketDescriptor)) {
@@ -253,9 +254,16 @@ ndn_Error ndn_SocketTransport_bind
 
         if (!isValidSocket(socketDescriptor))
             return NDN_ERROR_SocketTransport_socket_is_not_open;
-
-        int reuse = 1;
-        if (setsockopt(socketDescriptor, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0)
+        
+        // Windows does not support SO_REUSEPORT and we need it for macOS
+        // more info: https://stackoverflow.com/a/14388707/846340
+#if defined(_WIN32)
+        if (setsockopt(socketDescriptor, SOL_SOCKET, SO_REUSEADDR, 
+            (const char*)&reuseAddrOpt, sizeof(reuseAddrOpt)) < 0)
+#else
+        if (setsockopt(socketDescriptor, SOL_SOCKET, SO_REUSEPORT, 
+            (const char*)&reuseAddrOpt, sizeof(reuseAddrOpt)) < 0)
+#endif
         {
             return NDN_ERROR_SocketTransport_socket_is_not_open;
         }
