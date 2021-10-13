@@ -84,7 +84,7 @@ ndn_TcpTransport_isLocal(const char *host, int *result);
  * @param port The port to connect to.
  * @param elementListener A pointer to the ndn_ElementListener used by
  * ndn_SocketTransport_processEvents, which remain valid during the life of this
- * object or until replaced by the next call to connect.
+ * object or until replaced by the next call to connect/bind.
  * @return 0 for success, else an error code.
  */
 static __inline ndn_Error ndn_TcpTransport_connect
@@ -92,6 +92,24 @@ static __inline ndn_Error ndn_TcpTransport_connect
    struct ndn_ElementListener *elementListener)
 {
   return ndn_SocketTransport_connect
+    (&self->base, SOCKET_TCP, host, port, elementListener);
+}
+
+/**
+ * Bind with TCP to the host:port.
+ * @param self A pointer to the ndn_TcpTransport struct.
+ * @param host The host address to bind to.
+ * @param port The port to bind to.
+ * @param elementListener A pointer to the ndn_ElementListener used by
+ * ndn_SocketTransport_processEvents, which remain valid during the life of this
+ * object or until replaced by the next call to connect/bind.
+ * @return 0 for success, else an error code.
+ */
+static __inline ndn_Error ndn_TcpTransport_bind
+(struct ndn_TcpTransport* self, const char* host, unsigned short* port,
+    struct ndn_ElementListener* elementListener)
+{
+    return ndn_SocketTransport_bind
     (&self->base, SOCKET_TCP, host, port, elementListener);
 }
 

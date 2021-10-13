@@ -92,14 +92,43 @@ TcpTransport::connect
     dynamic_cast<const TcpTransport::ConnectionInfo&>(connectionInfo);
 
   ndn_Error error;
-  if ((error = ndn_TcpTransport_connect
-       (transport_.get(), (char *)tcpConnectionInfo.getHost().c_str(),
-        tcpConnectionInfo.getPort(), &elementListener)))
-    throw runtime_error(ndn_getErrorString(error));
+
+  // if connectionInfo already has socket -- use it and setup internal
+  // structures
+  if (tcpConnectionInfo.getSocketFd() > 0)
+  {
+      // TODO: refactor ?
+      ndn_ElementReader_reset(&(transport_->base.elementReader), &elementListener);
+      transport_->base.socketDescriptor = tcpConnectionInfo.getSocketFd();
+  }
+  else
+  {
+      if ((error = ndn_TcpTransport_connect
+      (transport_.get(), (char*)tcpConnectionInfo.getHost().c_str(),
+          tcpConnectionInfo.getPort(), &elementListener)))
+          throw runtime_error(ndn_getErrorString(error));
+  }
 
   isConnected_ = true;
   if (onConnected)
     onConnected();
+}
+
+void
+TcpTransport::bind(const Transport::ConnectionInfo& connectionInfo,
+    ElementListener& elementListener)
+{
+    const TcpTransport::ConnectionInfo& tcpConnectionInfo =
+        dynamic_cast<const TcpTransport::ConnectionInfo&>(connectionInfo);
+
+    boundPort_ = tcpConnectionInfo.getPort();
+    ndn_Error error;
+    if ((error = ndn_TcpTransport_bind
+    (transport_.get(), (char*)tcpConnectionInfo.getHost().c_str(),
+        &boundPort_, &elementListener)))
+        throw runtime_error(ndn_getErrorString(error));
+
+    isBound_ = true;
 }
 
 void
@@ -135,6 +164,18 @@ TcpTransport::getIsConnected()
   return isConnected_;
 }
 
+bool
+TcpTransport::getIsBound() const
+{
+    return isBound_;
+}
+
+unsigned short
+TcpTransport::getBoundPort() const
+{
+    return boundPort_;
+}
+
 void
 TcpTransport::close()
 {
@@ -143,6 +184,11 @@ TcpTransport::close()
     throw runtime_error(ndn_getErrorString(error));
 }
 
+int
+TcpTransport::getSocketFd() const
+{
+    return transport_->base.socketDescriptor;
+}
 }
 
 #endif // NDN_IND_HAVE_UNISTD_H

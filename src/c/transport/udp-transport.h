@@ -88,6 +88,17 @@ static __inline ndn_Error ndn_UdpTransport_connect
     (&self->base, SOCKET_UDP, host, port, elementListener);
 }
 
+/**
+ * Bind with UDP to the host:port.
+ * @param self A pointer to the ndn_UdpTransport struct.
+ * @param host The host address to bind to.
+ * @param port The port to bind to.
+ * @param elementListener A pointer to the ndn_ElementListener used by
+ * ndn_SocketTransport_processEvents, which remain valid during the life of this
+ * object or until replaced by the next call to connect.
+ * @return 0 for success, else an error code.
+ */
+
 static __inline ndn_Error ndn_UdpTransport_bind
 (struct ndn_UdpTransport* self, const char* host, unsigned short* port,
     struct ndn_ElementListener* elementListener)

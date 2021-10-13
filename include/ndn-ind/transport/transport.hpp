@@ -92,6 +92,18 @@ public:
           ElementListener& elementListener, const OnConnected& onConnected);
 
   /**
+   * Bind according to the info in ConnectionInfo, and processEvents() will
+   * use elementListener.
+   * @param connectionInfo A reference to an object of a subclass of
+   * ConnectionInfo.
+   * @param elementListener Not a shared_ptr because we assume that it will
+   * remain valid during the life of this object.
+   */
+  virtual void
+  bind(const Transport::ConnectionInfo& connectionInfo,
+       ElementListener& elementListener);
+
+  /**
    * Send data to the host
    * @param data A pointer to the buffer of data to send.
    * @param dataLength The number of bytes in data.
@@ -123,6 +135,12 @@ public:
 
   virtual bool
   getIsConnected();
+
+  virtual bool
+  getIsBound() const;
+
+  virtual unsigned short
+  getBoundPort() const;
 
   /**
    * Close the connection.  This base class implementation does nothing, but

@@ -117,7 +117,7 @@ public:
   /**
    * Connect according to the info in ConnectionInfo, and processEvents() will
    * use elementListener.
-   * @param connectionInfo A reference to a TcpTransport::ConnectionInfo.
+   * @param connectionInfo A reference to a UdpTransport::ConnectionInfo.
    * @param elementListener Not a shared_ptr because we assume that it will
    * remain valid during the life of this object.
    * @param onConnected This calls onConnected() when the connection is
@@ -127,13 +127,20 @@ public:
   connect(const Transport::ConnectionInfo& connectionInfo,
           ElementListener& elementListener, const OnConnected& onConnected);
 
-  // TODO: move to transport.hpp
-  typedef func_lib::function<void(const ptr_lib::shared_ptr<Transport>&, 
-          const ptr_lib::shared_ptr<Transport::ConnectionInfo>&)> onIncomingConnection;
-
+ /**
+ * Bind according to the info in ConnectionInfo, and processEvents() will
+ * use elementListener.
+ * @param connectionInfo A reference to a UdpTransport::ConnectionInfo.
+ * @param elementListener Not a shared_ptr because we assume that it will
+ * remain valid during the life of this object.
+ * @note Binds to all addresses (INADDR_ANY) if 
+ *       connectionInfo.getHost() == "" getBoundPort(). Binds to a randomly
+ *       chosen port if connectionInfo.getPort() == 0, to learn chosen port,
+ *       call getBoundPort()
+ */
   virtual void
   bind(const Transport::ConnectionInfo& connectionInfo,
-       ElementListener& elementListener);//, const OnIncomingConnection& onIncomingConnection);
+       ElementListener& elementListener);
 
   /**
    * Send data to the host
@@ -162,11 +169,11 @@ public:
   virtual bool
   getIsConnected();
 
-  virtual bool
-  getIsBound() const;
+  bool
+  getIsBound() const override;
 
   unsigned short
-  getBoundPort() const;
+  getBoundPort() const override;
 
   /**
    * Close the connection to the host.

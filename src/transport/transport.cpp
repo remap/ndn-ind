@@ -63,6 +63,13 @@ Transport::connect
 }
 
 void
+Transport::bind(const Transport::ConnectionInfo& connectionInfo,
+	ElementListener& elementListener)
+{
+	throw logic_error("unimplemented");
+}
+
+void
 Transport::send(const uint8_t *data, size_t dataLength)
 {
   throw logic_error("unimplemented");
@@ -84,6 +91,18 @@ bool
 Transport::getIsConnected()
 {
   throw logic_error("unimplemented");
+}
+
+bool
+Transport::getIsBound() const
+{
+	throw logic_error("unimplemented");
+}
+
+unsigned short
+Transport::getBoundPort() const
+{
+	throw logic_error("unimplemented");
 }
 
 void

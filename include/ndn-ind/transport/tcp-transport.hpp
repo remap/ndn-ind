@@ -62,7 +62,16 @@ public:
      * @param port The port number for the connection. If omitted, use 6363.
      */
     ConnectionInfo(const char *host, unsigned short port = 6363)
-    : host_(host), port_(port)
+    : host_(host), port_(port), socketFd_(-1)
+    {
+    }
+
+    /**
+     * Create a ConnectionInfo with the given socket descriptor.
+     * @param sockFd Opened socket descriptor for the connection.
+     */
+    ConnectionInfo(int sockFd)
+        : port_(0), socketFd_(sockFd)
     {
     }
 
@@ -80,12 +89,16 @@ public:
     unsigned short
     getPort() const { return port_; }
 
+    int
+    getSocketFd() const { return socketFd_; }
+
     virtual
     ~ConnectionInfo();
 
   private:
     std::string host_;
     unsigned short port_;
+    int socketFd_;
   };
 
   /**
@@ -134,6 +147,21 @@ public:
      ElementListener& elementListener, const OnConnected& onConnected);
 
   /**
+   * Bind according to the info in ConnectionInfo, and processEvents() will
+   * use elementListener.
+   * @param connectionInfo A reference to a TcpTransport::ConnectionInfo.
+   * @param elementListener Not a shared_ptr because we assume that it will
+   * remain valid during the life of this object.
+   * @note Binds to all addresses (INADDR_ANY) if 
+   *       connectionInfo.getHost() == "" getBoundPort(). Binds to a randomly
+   *       chosen port if connectionInfo.getPort() == 0, to learn chosen port,
+   *       call getBoundPort()
+   */
+  virtual void
+  bind(const Transport::ConnectionInfo& connectionInfo,
+       ElementListener& elementListener);
+
+  /**
    * Send data to the host
    * @param data A pointer to the buffer of data to send.
    * @param dataLength The number of bytes in data.
@@ -160,11 +188,20 @@ public:
   virtual bool
   getIsConnected();
 
+  bool
+  getIsBound() const override;
+
+  unsigned short
+  getBoundPort() const override;
+
   /**
    * Close the connection to the host.
    */
   virtual void
   close();
+
+protected:
+  int getSocketFd() const;
 
 private:
   ptr_lib::shared_ptr<struct ndn_TcpTransport> transport_;
@@ -172,6 +209,8 @@ private:
   bool isConnected_;
   ConnectionInfo connectionInfo_;
   bool isLocal_;
+  bool isBound_;
+  unsigned short boundPort_;
 };
 
 }
