@@ -46,6 +46,7 @@ namespace ndntools {
 #if NDN_IND_HAVE_UNISTD_H
 #include <unistd.h>
 #include <netdb.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
