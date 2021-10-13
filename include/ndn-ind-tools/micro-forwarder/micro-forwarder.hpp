@@ -88,6 +88,10 @@ public:
   ndn::ptr_lib::shared_ptr<const ndn::UdpTransport>
       addChannel(const ndn::ptr_lib::shared_ptr<const ndn::UdpTransport::ConnectionInfo>& connectionInfo);
 
+  // TODO: add documentation
+  ndn::ptr_lib::shared_ptr<const ndn::TcpTransport>
+      addChannel(const ndn::ptr_lib::shared_ptr<const ndn::TcpTransport::ConnectionInfo>& connectionInfo);
+
   /**
    * Find or create the FIB entry with the given name and add the ForwarderFace
    * with the given faceId. All routes are multicast by default.
@@ -177,7 +181,9 @@ public:
   std::map<std::string, std::vector<int> > getRoutes() const;
 
 private:
+    class Channel;
     class UdpChannel;
+    class TcpChannel;
 
   /**
    * A ForwarderFace is used by the faces list to represent a connection using
@@ -460,7 +466,7 @@ private:
   std::vector<ndn::ptr_lib::shared_ptr<PitEntry> > PIT_;
   std::vector<ndn::ptr_lib::shared_ptr<FibEntry> > FIB_;
   std::vector<ndn::ptr_lib::shared_ptr<ForwarderFace> > faces_;
-  std::vector<ndn::ptr_lib::shared_ptr<UdpChannel> > channels_;
+  std::vector<ndn::ptr_lib::shared_ptr<Channel> > channels_;
   std::chrono::nanoseconds minPitEntryLifetime_;
 
   ndn::Name localhostNamePrefix;

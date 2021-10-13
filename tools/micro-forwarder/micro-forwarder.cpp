@@ -57,18 +57,73 @@ namespace ndntools {
 #include <ws2tcpip.h>
 #endif
 
-    class MicroForwarder::UdpChannel : public ndn::ElementListener, public ndn::UdpTransport {
+    class MicroForwarder::Channel : public ndn::ElementListener {
+    public:
+        Channel(MicroForwarder * parent) : parent_(parent) {}
+
+        virtual void processEvents() = 0;
+
+    protected:
+        MicroForwarder* parent_;
+
+        bool pollSocket(int s)
+        {
+            int pollResult;
+#if defined(_WIN32)
+            // See: https://github.com/microsoft/Windows-classic-samples/blob/master/Samples/Win7Samples/netds/winsock/wsapoll/poll.cpp
+            WSAPOLLFD pollInfo = { 0 };
+#else
+            struct pollfd pollInfo[1];
+#endif
+#if defined(_WIN32)
+            pollInfo.fd = s;
+            pollInfo.events = POLLRDNORM;
+            pollResult = WSAPoll(&pollInfo, 1, 0);
+#else
+            pollInfo[0].fd = s;
+            pollInfo[0].events = POLLIN;
+            pollResult = poll(pollInfo, 1, 0);
+#endif
+
+#if defined(_WIN32)
+            if (pollResult == SOCKET_ERROR)
+#else
+            if (pollResult < 0)
+#endif
+                throw runtime_error("poll error: " + string(strerror(errno)));
+            else if (pollResult == 0)
+                // Timeout, so no data ready.
+                return false;
+            else {
+#if defined(_WIN32)
+                if (pollInfo.revents & POLLRDNORM)
+#else
+                if (pollInfo[0].revents & POLLIN)
+#endif
+                    return true;
+            }
+
+            return false;
+        }
+
+        void onReceivedElement(const uint8_t* element, size_t elementLength) override
+        { 
+            /* phony call - do nothing */
+        }
+    };
+
+    class MicroForwarder::UdpChannel : public Channel, public ndn::UdpTransport {
     public:
 
         UdpChannel(MicroForwarder *parent, int port = 0, std::string host = "")
-            : connInfo_(ptr_lib::make_shared<ndn::UdpTransport::ConnectionInfo>(host.c_str(), port))
-            , parent_(parent)
+            : Channel(parent)
+            , connInfo_(ptr_lib::make_shared<ndn::UdpTransport::ConnectionInfo>(host.c_str(), port))
         {
             bind(*connInfo_, *this);
         }
         UdpChannel(MicroForwarder* parent, ndn::ptr_lib::shared_ptr<const UdpTransport::ConnectionInfo> connInfo)
-            : connInfo_(connInfo)
-            , parent_(parent)
+            : Channel(parent)
+            , connInfo_(connInfo)
         {
             bind(*connInfo_, *this);
         }
@@ -136,50 +191,103 @@ namespace ndntools {
 
     private:
         ptr_lib::shared_ptr<const UdpTransport::ConnectionInfo> connInfo_;
-        MicroForwarder* parent_;
 
-        bool pollSocket(int s)
+    };
+
+    class MicroForwarder::TcpChannel : public Channel, public ndn::TcpTransport {
+    public:
+        TcpChannel(MicroForwarder* parent, int port = 0, std::string host = "")
+            : Channel(parent)
+            , connInfo_(ptr_lib::make_shared<ndn::TcpTransport::ConnectionInfo>(host.c_str(), port))
         {
-            int pollResult;
-#if defined(_WIN32)
-            // See: https://github.com/microsoft/Windows-classic-samples/blob/master/Samples/Win7Samples/netds/winsock/wsapoll/poll.cpp
-            WSAPOLLFD pollInfo = { 0 };
-#else
-            struct pollfd pollInfo[1];
-#endif
-#if defined(_WIN32)
-            pollInfo.fd = s;
-            pollInfo.events = POLLRDNORM;
-            pollResult = WSAPoll(&pollInfo, 1, 0);
-#else
-            pollInfo[0].fd = s;
-            pollInfo[0].events = POLLIN;
-            pollResult = poll(pollInfo, 1, 0);
-#endif
-
-#if defined(_WIN32)
-            if (pollResult == SOCKET_ERROR)
-#else
-            if (pollResult < 0)
-#endif
-                throw runtime_error("poll error: " + string(strerror(errno)));
-            else if (pollResult == 0)
-                // Timeout, so no data ready.
-                return false;
-            else {
-#if defined(_WIN32)
-                if (pollInfo.revents & POLLRDNORM)
-#else
-                if (pollInfo[0].revents & POLLIN)
-#endif
-                    return true;
-            }
-
-            return false;
+            bind(*connInfo_, *this);
+            listen();
+        }
+        TcpChannel(MicroForwarder* parent, ndn::ptr_lib::shared_ptr<const TcpTransport::ConnectionInfo> connInfo)
+            : Channel(parent)
+            , connInfo_(connInfo)
+        {
+            bind(*connInfo_, *this);
+            listen();
         }
 
-        void onReceivedElement(const uint8_t* element, size_t elementLength) override
-        { /* phony call - do nothing */ }
+        void processEvents()
+        {
+            // Loop until there is no more data in the receive buffer.
+            while (1)
+            {
+                //ndn_Error error;
+                size_t nBytes;
+                int socket = getSocketFd();
+
+                if (!pollSocket(socket))
+                    return;
+
+                { // accept connection
+                    struct sockaddr_in from;
+#if defined(_WIN32)
+                    int
+#else
+                    unsigned int
+#endif 
+                        slen = sizeof(from);
+
+                    int incomingFd = ndntools::accept(socket, (struct sockaddr*)&from, &slen);
+#if defined(_WIN32)
+                    if (incomingFd == INVALID_SOCKET)
+                    {
+                        if (WSAGetLastError() == WSAEWOULDBLOCK)
+                            return;
+                        throw runtime_error("error in accept(): " + to_string(WSAGetLastError()));
+                    }
+#else
+                    if (incomingFd < 0)
+                    {
+                        if (errno == EWOULDBLOCK)
+                            return;
+                        throw runtime_error("error in accept(): " + string(strerror(errno)));
+                    }
+#endif 
+                    string remoteHost(inet_ntoa(from.sin_addr));
+                    int remotePort = ntohs(from.sin_port);
+                    string faceUri = "tcp://" + remoteHost + ":" + to_string(remotePort);
+                    ForwarderFace* face = parent_->findFaceByUri(faceUri);
+
+                    if (!face)
+                    {
+                        auto faceTransport = make_shared<TcpTransport>();
+                        int faceId = parent_->addFace(faceUri, faceTransport,
+                            make_shared<ndn::TcpTransport::ConnectionInfo>(incomingFd));
+
+                        _LOG_DEBUG("Created on-demand Face " << faceUri);
+                    }
+                    else
+                        _LOG_WARN("New connection from existing face: " << faceUri);
+                }
+            }
+        }
+
+    private:
+        ptr_lib::shared_ptr<const TcpTransport::ConnectionInfo> connInfo_;
+
+        void listen()
+        {
+#if defined(_WIN32)
+            u_long nonBlockOn = 1;
+            if (ioctlsocket(getSocketFd(), FIONBIO, &nonBlockOn) != NO_ERROR)
+                throw runtime_error("error making socket non-blocking: " + to_string(WSAGetLastError()));
+
+            if (ndntools::listen(getSocketFd(), 32) == SOCKET_ERROR)
+                throw runtime_error("error in listen() call: " + to_string(WSAGetLastError()));
+#else
+            int nonBlockOn = 1;
+            if (ioctl(getSocketFd(), FIONBIO, (char*)&nonBlockOn) < 0)
+                throw runtime_error("error making socket non-blocking: " + string(strerror(errno)));
+
+            if (ndntools::listen(getSocketFd(), 32) < 0)
+                throw runtime_error("error in listen() call: " + string(strerror(errno)));
+#endif
+        }
     };
 
 
@@ -266,6 +374,17 @@ MicroForwarder::addChannel(const ptr_lib::shared_ptr<const UdpTransport::Connect
     channels_.push_back(channel);
 
     _LOG_INFO("Created UDP listen channel on port " << channel->getBoundPort());
+    return channel;
+}
+
+ndn::ptr_lib::shared_ptr<const ndn::TcpTransport>
+MicroForwarder::addChannel(const ptr_lib::shared_ptr<const TcpTransport::ConnectionInfo>& connectionInfo)
+{
+    auto channel = ptr_lib::make_shared<TcpChannel>(this, connectionInfo);
+
+    channels_.push_back(channel);
+
+    _LOG_INFO("Created TCP listen channel on port " << channel->getBoundPort());
     return channel;
 }
 
