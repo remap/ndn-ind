@@ -99,7 +99,9 @@
 /* #undef HAVE_LIBPTHREAD */
 
 /* Define to 1 if you have the `sqlite3' library (-lsqlite3). */
-/* #undef HAVE_LIBSQLITE3 */
+#ifndef NDN_IND_HAVE_LIBSQLITE3
+#define NDN_IND_HAVE_LIBSQLITE3 1
+#endif
 
 /* Define to 1 if you have `z' library (-lz) */
 #ifndef NDN_IND_HAVE_LIBZ
@@ -150,7 +152,9 @@
 #endif
 
 /* Have the SQLITE3 library */
-/* #undef HAVE_SQLITE3 */
+#ifndef NDN_IND_HAVE_SQLITE3
+#define NDN_IND_HAVE_SQLITE3
+#endif
 
 /* Define to 1 if you have the `sscanf' function. */
 #ifndef NDN_IND_HAVE_SSCANF
