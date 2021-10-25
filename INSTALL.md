@@ -113,6 +113,11 @@ Optional: To install libsqlite3, in a terminal, enter:
 
     sudo apt install libsqlite3-dev
 
+To use std::filesystem with Sqlite3 on Ubuntu 18.04, you also need gcc 8 (if not using clang). Enter:
+
+    sudo apt-get install gcc-8 g++-8
+    sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
+
 Optional: To install Protobuf, in a terminal, enter:
 
     sudo apt install libprotobuf-dev protobuf-compiler
