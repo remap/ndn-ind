@@ -111,6 +111,16 @@ ndn_computePbkdf2WithHmacSha1
      saltLength, nIterations, resultLength, (unsigned char *)result);
 }
 
+void
+ndn_computePbkdf2WithHmacSha256
+  (const uint8_t *password, size_t passwordLength, const uint8_t *salt,
+   size_t saltLength, int nIterations, size_t resultLength, uint8_t *result)
+{
+  PKCS5_PBKDF2_HMAC
+    ((const char *)password, passwordLength, (const unsigned char *)salt,
+     saltLength, nIterations, EVP_sha256(), resultLength, (unsigned char *)result);
+}
+
 size_t
 ndn_getEcKeyInfoCount() { return sizeof(EC_KEY_INFO) / sizeof(EC_KEY_INFO[0]); }
 
