@@ -90,6 +90,16 @@ CryptoLite::computePbkdf2WithHmacSha1
      result);
 }
 
+void
+CryptoLite::computePbkdf2WithHmacSha256
+  (const uint8_t* password, size_t passwordLength, const uint8_t* salt,
+   size_t saltLength, int nIterations, size_t resultLength, uint8_t* result)
+{
+  ndn_computePbkdf2WithHmacSha256
+    (password, passwordLength, salt, saltLength, nIterations, resultLength,
+     result);
+}
+
 #endif
 
 bool
