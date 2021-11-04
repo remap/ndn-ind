@@ -37,6 +37,7 @@
 #include "../../c/util/crypto.h"
 #include <ndn-ind/lite/util/crypto-lite.hpp>
 #include <ndn-ind/lite/encrypt/algo/des-algorithm-lite.hpp>
+#include <ndn-ind/lite/encrypt/algo/aes-algorithm-lite.hpp>
 #include <ndn-ind/security/tpm/tpm-private-key.hpp>
 
 using namespace std;
@@ -49,7 +50,10 @@ static const char *RSA_ENCRYPTION_OID = "1.2.840.113549.1.1.1";
 static const char *EC_ENCRYPTION_OID = "1.2.840.10045.2.1";
 static const char *PBES2_OID = "1.2.840.113549.1.5.13";
 static const char *PBKDF2_OID = "1.2.840.113549.1.5.12";
+static const char *HMAC_WITH_SHA1_OID = "1.2.840.113549.2.7";
+static const char *HMAC_WITH_SHA256_OID = "1.2.840.113549.2.9";
 static const char *DES_EDE3_CBC_OID = "1.2.840.113549.3.7";
+static const char *AES_256_CBC_OID = "2.16.840.1.101.3.4.1.42";
 
 void
 TpmPrivateKey::loadPkcs1
@@ -230,6 +234,7 @@ TpmPrivateKey::loadEncryptedPkcs8
       // Decode the PBKDF2 parameters.
       Blob salt;
       int nIterations;
+      string prfOidString;
       try {
         const std::vector<ptr_lib::shared_ptr<DerNode> >& pbkdf2ParametersChildren =
           dynamic_cast<DerNode::DerSequence&>(*keyDerivationParameters).getChildren();
@@ -237,6 +242,16 @@ TpmPrivateKey::loadEncryptedPkcs8
           (pbkdf2ParametersChildren[0].get())->toVal();
         nIterations = dynamic_cast<DerNode::DerInteger*>
           (pbkdf2ParametersChildren[1].get())->toIntegerVal();
+
+        if (pbkdf2ParametersChildren.size() >= 3) {
+          const std::vector<ptr_lib::shared_ptr<DerNode> >& prfAlgorithmIdChildren =
+            DerNode::getSequence(pbkdf2ParametersChildren, 2).getChildren();
+          prfOidString = dynamic_cast<DerNode::DerOid&>
+            (*prfAlgorithmIdChildren[0]).toVal().toRawStr();
+        }
+        else
+          // Default.
+          prfOidString = HMAC_WITH_SHA1_OID;
       } catch (const std::exception& ex) {
         throw Error(string
           ("Cannot decode the PBES2 parameters: ") + ex.what());
@@ -246,14 +261,23 @@ TpmPrivateKey::loadEncryptedPkcs8
       int resultLength;
       if (encryptionSchemeOidString == DES_EDE3_CBC_OID)
         resultLength = ndn_DES_EDE3_KEY_LENGTH;
+      else if (encryptionSchemeOidString == AES_256_CBC_OID)
+        resultLength = ndn_AES_256_KEY_LENGTH;
       else
         throw Error("Unrecognized PBES2 encryption scheme OID: " +
           encryptionSchemeOidString);
 
       derivedKey.resize(resultLength);
-      CryptoLite::computePbkdf2WithHmacSha1
-        (password, passwordLength, salt.buf(), salt.size(), nIterations,
-         resultLength, &derivedKey.front());
+      if (prfOidString == HMAC_WITH_SHA1_OID)
+        CryptoLite::computePbkdf2WithHmacSha1
+          (password, passwordLength, salt.buf(), salt.size(), nIterations,
+           resultLength, &derivedKey.front());
+      else if (prfOidString == HMAC_WITH_SHA256_OID)
+        CryptoLite::computePbkdf2WithHmacSha256
+          (password, passwordLength, salt.buf(), salt.size(), nIterations,
+           resultLength, &derivedKey.front());
+      else
+        throw Error("Unrecognized PBKDF2 PRF OID: " + encryptionSchemeOidString);
     }
     else
       throw Error
@@ -278,6 +302,25 @@ TpmPrivateKey::loadEncryptedPkcs8
             encryptedKey.buf(), encryptedKey.size(), &pkcs8Encoding.front(),
             pkcs8EncodingLength)))
         throw Error(string("Error decrypting PKCS #8 key with DES-EDE3-CBC: ") +
+                    ndn_getErrorString(error));
+    }
+    else if (encryptionSchemeOidString == AES_256_CBC_OID) {
+      // Decode the AES-CBC parameters.
+      Blob initialVector;
+      try {
+        initialVector = dynamic_cast<DerNode::DerOctetString*>
+          (encryptionSchemeParameters.get())->toVal();
+      } catch (const std::exception& ex) {
+        throw Error(string
+          ("Cannot decode the AES-256-CBC parameters: ") + ex.what());
+      }
+
+      ndn_Error error;
+      if ((error = AesAlgorithmLite::decrypt256Cbc
+           (&derivedKey.front(), derivedKey.size(), initialVector.buf(),
+            initialVector.size(), encryptedKey.buf(), encryptedKey.size(),
+            &pkcs8Encoding.front(), pkcs8EncodingLength)))
+        throw Error(string("Error decrypting PKCS #8 key with AES-256-CBC: ") +
                     ndn_getErrorString(error));
     }
     else
@@ -500,6 +543,7 @@ TpmPrivateKey::toEncryptedPkcs8
     (salt, sizeof(salt)));
   keyDerivationParameters->addChild(ptr_lib::make_shared<DerNode::DerInteger>
     (nIterations));
+  // Omit the default HMAC_WITH_SHA1_OID.
   ptr_lib::shared_ptr<DerSequence> keyDerivationAlgorithmIdentifier
     (new DerSequence());
   keyDerivationAlgorithmIdentifier->addChild
